@@ -87,6 +87,23 @@ rebuild.
 - `avahi` / mDNS for network printer discovery (most distros already)
 - Working GL stack (OpenGL driver in user session)
 
+## Disclaimer
+
+This is an **unofficial, community-maintained** Nix packaging of Snapmaker
+Orca. It is **not affiliated with, endorsed by, or supported by Snapmaker**.
+Snapmaker®, Snapmaker Orca, Snapmaker U1, and SnapSwap are trademarks of
+their respective owners. This repository only provides a Nix-side wrapper
+and redistributes the unmodified upstream AppImage under its original
+license.
+
+- Bugs in the slicer itself (UI, slicing behaviour, printer communication,
+  crashes): report upstream at
+  <https://github.com/Snapmaker/OrcaSlicer>.
+- Issues specific to **this Nix flake** (build failure, wrapper runtime
+  issue, dependency problem on NixOS): open an issue here.
+
+The software is provided without any warranty. You use it at your own risk.
+
 ## License
 
 The Nix packaging code (`flake.nix` and related files) is MIT licensed — see
