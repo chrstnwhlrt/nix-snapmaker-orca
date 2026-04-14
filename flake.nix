@@ -313,7 +313,7 @@
           snapmaker-orca = {
             type = "app";
             program = nixpkgs.lib.getExe self.packages.${system}.snapmaker-orca;
-            meta = self.packages.${system}.snapmaker-orca.meta;
+            inherit (self.packages.${system}.snapmaker-orca) meta;
           };
           default = snapmaker-orca;
         }
