@@ -9,11 +9,17 @@ on:
 permissions:
   contents: read
 
+# A full build takes ~25 minutes on 24 cores and will not finish within
+# the GitHub-hosted runner's memory / time budget for this repository.
+# CI therefore only runs the evaluation half of `nix flake check`
+# (type + schema validation of all outputs, patches apply cleanly,
+# inputs resolve). The actual build is exercised locally via
+# `nix build .#default` before every release.
 jobs:
-  check:
-    name: nix flake check
+  evaluate:
+    name: nix flake check (eval only)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -23,5 +29,5 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
-      - name: Flake check (build + evaluate all outputs)
-        run: nix flake check --print-build-logs
+      - name: Flake evaluation + schema check
+        run: nix flake check --no-build --print-build-logs

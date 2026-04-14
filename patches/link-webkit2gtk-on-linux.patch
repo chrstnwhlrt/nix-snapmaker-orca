@@ -1,0 +1,27 @@
+Always link webkit2gtk-4.1 to libslic3r_gui on Linux.
+
+WebView.cpp references webkit_web_view_run_javascript_finish, but
+Snapmaker's src/slic3r/CMakeLists.txt only adds the webkit2gtk link
+inside the FLATPAK branch. On non-Flatpak Linux builds (i.e. nixpkgs
+and distro-native builds) the final executable link then fails with
+"DSO missing from command line".
+
+This patch unconditionally links webkit2gtk-4.1 on Linux, matching
+the upstream OrcaSlicer fix at
+https://github.com/nixos/nixpkgs/blob/master/pkgs/by-name/or/orca-slicer/patches/0001-not-for-upstream-CMakeLists-Link-against-webkit2gtk-.patch
+but adapted to Snapmaker's file layout (the link lives in
+src/slic3r/CMakeLists.txt rather than src/CMakeLists.txt in their fork).
+
+--- a/src/slic3r/CMakeLists.txt
++++ b/src/slic3r/CMakeLists.txt
+@@ -731,6 +731,10 @@ if (UNIX AND NOT APPLE)
+     target_include_directories(libslic3r_gui SYSTEM PRIVATE ${GTK${SLIC3R_GTK}_INCLUDE_DIRS} ${LIBSECRET_INCLUDE_DIRS})
+     target_link_libraries(libslic3r_gui ${GTK${SLIC3R_GTK}_LIBRARIES} fontconfig ${LIBSECRET_LIBRARIES})
+
++    # WebView.cpp references webkit symbols directly; wxGTK does not
++    # transitively pull webkit2gtk in, so link it explicitly here.
++    pkg_check_modules(webkit2gtk REQUIRED webkit2gtk-4.1)
++    target_link_libraries(libslic3r_gui ${webkit2gtk_LIBRARIES})
+
+     # We add GStreamer for bambu:/// support.
+     pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)

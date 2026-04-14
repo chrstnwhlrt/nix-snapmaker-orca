@@ -1,5 +1,5 @@
 {
-  description = "Snapmaker Orca — beta slicer for Snapmaker U1 (AppImage wrapper)";
+  description = "Snapmaker Orca — beta slicer for the Snapmaker U1 (from-source build)";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -17,114 +17,261 @@
           }
         );
 
-      # Package derivation. The function signature is nixpkgs-conformant so
-      # the whole block can be dropped verbatim into nixpkgs as
+      # Package derivation. Signature matches what nixpkgs' callPackage
+      # expects, so the block can be dropped verbatim into nixpkgs as
       # `pkgs/by-name/sn/snapmaker-orca/package.nix` when PR'ing upstream.
+      #
+      # Structurally this is nixpkgs' `orca-slicer` derivation adapted for
+      # Snapmaker's fork: Snapmaker's CMake project builds the `Snapmaker_Orca`
+      # binary and retains Orca's upstream cmake options and dependency
+      # tree. Only a subset of nixpkgs' patches applies: the webkit2gtk-
+      # linker patch targets a line range that Snapmaker's fork has moved,
+      # and the PR 7650 backport is dropped because Snapmaker carries an
+      # equivalent fix. All other dependencies, build flags and GL
+      # workarounds mirror the upstream derivation.
       snapmakerOrca =
         {
+          stdenv,
           lib,
-          fetchurl,
-          appimageTools,
-          makeDesktopItem,
-          nix-update-script,
-          webkitgtk_4_1,
-          libsoup_3,
-          libsecret,
+          binutils,
+          fetchFromGitHub,
+          cmake,
+          pkg-config,
+          wrapGAppsHook3,
+          boost186,
+          cereal,
+          cgal_5,
+          curl,
+          dbus,
+          draco,
+          eigen,
+          expat,
+          ffmpeg,
+          gcc-unwrapped,
+          glew,
+          glfw,
+          glib,
           glib-networking,
+          gmp,
           gst_all_1,
+          gtest,
+          gtk3,
+          hicolor-icon-theme,
+          libsecret,
+          libpng,
+          mpfr,
+          nix-update-script,
+          nlopt,
+          opencascade-occt_7_6,
+          openvdb,
+          opencv,
+          pcre,
+          systemd,
+          onetbb,
+          webkitgtk_4_1,
+          wxwidgets_3_1,
+          libx11,
+          libnoise,
+          withSystemd ? stdenv.hostPlatform.isLinux,
+          # Default true: on NVIDIA + Wayland the native EGL path regularly
+          # fails with EGL_BAD_PARAMETER. Forcing mesa+zink (OpenGL via Vulkan)
+          # sidesteps the proprietary driver's EGL implementation entirely
+          # and is stable across NVIDIA driver releases.
+          withNvidiaGLWorkaround ? true,
         }:
-
         let
+          wxGTK' =
+            (wxwidgets_3_1.override {
+              withCurl = true;
+              withPrivateFonts = true;
+              withWebKit = true;
+              withEGL = false;
+            }).overrideAttrs
+              (old: {
+                buildInputs = old.buildInputs ++ [ libsecret ];
+                configureFlags = old.configureFlags ++ [
+                  "--enable-debug=no"
+                  "--enable-secretstore"
+                ];
+              });
+        in
+        stdenv.mkDerivation (finalAttrs: {
           pname = "snapmaker-orca";
           version = "2.3.0";
 
-          # Beta / Ubuntu-build tags kept as single-point-of-truth vars so
-          # future releases that change the asset naming need one edit only.
-          channel = "Beta";
-          buildTag = "Ubuntu2404";
-
-          src = fetchurl {
-            url = "https://github.com/Snapmaker/OrcaSlicer/releases/download/v${version}/Snapmaker_Orca_Linux_AppImage_${buildTag}_V${version}_${channel}.AppImage";
-            # Stable store-path name, decoupled from the asset filename.
-            name = "${pname}-${version}.AppImage";
-            hash = "sha256-02du3A5Thd61N6ROh0lqTHtjEAeIS61SNNzE9cjYsJs=";
+          src = fetchFromGitHub {
+            owner = "Snapmaker";
+            repo = "OrcaSlicer";
+            tag = "v${finalAttrs.version}";
+            hash = "sha256-ytlBQHvk1zjcDYN751pTeFtSeTfado5rAfivLxEq84o=";
           };
 
-          # Extract the AppImage once — only needed to lift out the icon.
-          contents = appimageTools.extract { inherit pname version src; };
+          nativeBuildInputs = [
+            cmake
+            pkg-config
+            wrapGAppsHook3
+            wxGTK'
+          ];
 
-          # Fresh desktop item instead of patching the upstream one; more
-          # robust against future changes in the shipped .desktop file.
-          desktopItem = makeDesktopItem {
-            name = pname;
-            exec = "${pname} %F";
-            icon = pname;
-            desktopName = "Snapmaker Orca";
-            genericName = "3D Slicer";
-            comment = "Beta slicer for Snapmaker U1 (OrcaSlicer fork)";
-            categories = [
-              "Graphics"
-              "3DGraphics"
-              "Engineering"
-            ];
-            mimeTypes = [
-              "model/stl"
-              "application/vnd.ms-3mfdocument"
-              "application/prs.wavefront-obj"
-              "application/x-amf"
-            ];
-            keywords = [
-              "slicer"
-              "3d-printing"
-              "snapmaker"
-              "orca"
-              "gcode"
-            ];
-            startupNotify = true;
-            startupWMClass = "Snapmaker_Orca";
-          };
-        in
-        appimageTools.wrapType2 {
-          inherit pname version src;
-
-          # Runtime libraries the AppImage does not bundle itself.
-          # Reference: nixpkgs' orca-slicer (from-source) buildInputs.
-          extraPkgs = pkgs: [
-            webkitgtk_4_1 # Embedded browser (marketplace / settings views)
-            libsoup_3 # WebKit HTTP stack
-            libsecret # Credential storage (web logins)
-            glib-networking # TLS backend for WebKit
+          buildInputs = [
+            binutils
+            (boost186.override {
+              enableShared = true;
+              enableStatic = false;
+              extraFeatures = [
+                "log"
+                "thread"
+                "filesystem"
+              ];
+            })
+            boost186.dev
+            cereal
+            cgal_5
+            curl
+            dbus
+            draco
+            eigen
+            expat
+            ffmpeg
+            gcc-unwrapped
+            glew
+            glfw
+            glib
+            glib-networking
+            gmp
             gst_all_1.gstreamer
             gst_all_1.gst-plugins-base
+            gst_all_1.gst-plugins-bad
             gst_all_1.gst-plugins-good
-            gst_all_1.gst-plugins-bad # h264 decoder for print previews
+            gtk3
+            hicolor-icon-theme
+            libsecret
+            libpng
+            mpfr
+            nlopt
+            opencascade-occt_7_6
+            openvdb
+            pcre
+            onetbb
+            webkitgtk_4_1
+            wxGTK'
+            libx11
+            opencv.cxxdev
+            libnoise
+          ]
+          ++ lib.optionals withSystemd [ systemd ]
+          ++ finalAttrs.checkInputs;
+
+          patches = [
+            # Snapmaker only links webkit2gtk in the FLATPAK branch; on
+            # a native nixpkgs build the final link fails because
+            # WebView.cpp references webkit symbols directly. Always
+            # link webkit2gtk on Linux.
+            ./patches/link-webkit2gtk-on-linux.patch
+            # nixpkgs orca-slicer: link opencv_core + opencv_imgproc instead
+            # of the unified opencv_world (nixpkgs' opencv is split).
+            ./patches/dont-link-opencv-world-orca.patch
+            # nixpkgs orca-slicer: remove obsolete IlmBase dependency from
+            # FindOpenVDB, cherry-picking PrusaSlicer PR #14207. Required
+            # because nixpkgs openvdb no longer pulls in ilmbase.
+            ./patches/no-ilmbase.patch
           ];
 
-          # NVIDIA / Wayland blank-window workaround, same as nixpkgs
-          # orca-slicer applies via its preFixup.
-          extraBwrapArgs = [
-            "--setenv"
-            "WEBKIT_DISABLE_COMPOSITING_MODE"
-            "1"
-          ];
+          doCheck = true;
+          checkInputs = [ gtest ];
 
-          extraInstallCommands = ''
-            install -Dm644 ${desktopItem}/share/applications/${pname}.desktop \
-              $out/share/applications/${pname}.desktop
+          separateDebugInfo = true;
 
-            # Mirror every hicolor size upstream ships and rename it to our
-            # pname, so future AppImages with more/different sizes are picked
-            # up without a code change.
-            if [ -d ${contents}/usr/share/icons/hicolor ]; then
-              for png in ${contents}/usr/share/icons/hicolor/*/apps/Snapmaker_Orca.png; do
-                size_dir=$(dirname "$(dirname "$png")")
-                size=$(basename "$size_dir")
-                install -Dm644 "$png" "$out/share/icons/hicolor/$size/apps/${pname}.png"
-              done
-            fi
+          env = {
+            NLOPT = nlopt;
+
+            NIX_CFLAGS_COMPILE = toString (
+              [
+                "-Wno-ignored-attributes"
+                "-I${opencv.out}/include/opencv4"
+                "-Wno-error=incompatible-pointer-types"
+                "-Wno-template-id-cdtor"
+                "-Wno-uninitialized"
+                "-Wno-unused-result"
+                "-Wno-deprecated-declarations"
+                "-Wno-use-after-free"
+                "-Wno-format-overflow"
+                "-Wno-stringop-overflow"
+                "-DBOOST_ALLOW_DEPRECATED_HEADERS"
+                "-DBOOST_MATH_DISABLE_STD_FPCLASSIFY"
+                "-DBOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS"
+                "-DBOOST_MATH_DISABLE_FLOAT128"
+                "-DBOOST_MATH_NO_QUAD_SUPPORT"
+                "-DBOOST_MATH_MAX_FLOAT128_DIGITS=0"
+                "-DBOOST_CSTDFLOAT_NO_LIBQUADMATH_SUPPORT"
+                "-DBOOST_MATH_DISABLE_FLOAT128_BUILTIN_FPCLASSIFY"
+              ]
+              ++ lib.optionals (stdenv.cc.isGNU && lib.versionAtLeast stdenv.cc.version "14") [
+                "-Wno-error=template-id-cdtor"
+              ]
+            );
+
+            NIX_LDFLAGS = toString [
+              (lib.optionalString withSystemd "-ludev")
+              "-L${boost186}/lib"
+              "-lboost_log"
+              "-lboost_log_setup"
+            ];
+          };
+
+          prePatch = ''
+            sed -i 's|nlopt_cxx|nlopt|g' cmake/modules/FindNLopt.cmake
+            sed -i 's|"libnoise/noise.h"|"noise/noise.h"|' src/libslic3r/PerimeterGenerator.cpp
+            sed -i 's|"libnoise/noise.h"|"noise/noise.h"|' src/libslic3r/Feature/FuzzySkin/FuzzySkin.cpp
           '';
 
-          # Lets `nix-update snapmaker-orca` bump version + hash automatically.
+          cmakeFlags = [
+            (lib.cmakeBool "SLIC3R_STATIC" false)
+            (lib.cmakeBool "SLIC3R_FHS" true)
+            (lib.cmakeFeature "SLIC3R_GTK" "3")
+            (lib.cmakeBool "BBL_RELEASE_TO_PUBLIC" true)
+            (lib.cmakeBool "BBL_INTERNAL_TESTING" false)
+            (lib.cmakeBool "SLIC3R_BUILD_TESTS" false)
+            (lib.cmakeFeature "CMAKE_CXX_FLAGS" "-DGL_SILENCE_DEPRECATION")
+            (lib.cmakeFeature "CMAKE_EXE_LINKER_FLAGS" "-Wl,--no-as-needed")
+            (lib.cmakeBool "ORCA_VERSION_CHECK_DEFAULT" false)
+            (lib.cmakeFeature "LIBNOISE_INCLUDE_DIR" "${libnoise}/include")
+            # Snapmaker's Findlibnoise.cmake searches for LIBNOISE_LIBRARY
+            # (not _RELEASE like upstream SoftFever). Point it directly at
+            # nixpkgs libnoise's static archive.
+            (lib.cmakeFeature "LIBNOISE_LIBRARY" "${libnoise}/lib/libnoise-static.a")
+            # Snapmaker bundles paho-mqtt-c (for U1 network-print support)
+            # which declares cmake_minimum_required < 3.5 and also uses
+            # `typedef unsigned int bool;` in MQTTPacket.h — both rejected
+            # by modern tooling (CMake 4+ and GCC 15's default C23 mode).
+            # Force the older CMake compatibility shim and pin C to C17
+            # so the typedef stays legal. Upstream orca-slicer does not
+            # bundle paho so these flags are Snapmaker-specific.
+            (lib.cmakeFeature "CMAKE_POLICY_VERSION_MINIMUM" "3.5")
+            (lib.cmakeFeature "CMAKE_C_STANDARD" "17")
+            "-Wno-dev"
+          ];
+
+          postBuild = "( cd .. && ./scripts/run_gettext.sh )";
+
+          preFixup = ''
+            gappsWrapperArgs+=(
+              --prefix LD_LIBRARY_PATH : "$out/lib:${lib.makeLibraryPath [ glew ]}"
+              --set WEBKIT_DISABLE_COMPOSITING_MODE 1
+              ${lib.optionalString withNvidiaGLWorkaround ''
+                --set __GLX_VENDOR_LIBRARY_NAME mesa
+                --set __EGL_VENDOR_LIBRARY_FILENAMES /run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json
+                --set MESA_LOADER_DRIVER_OVERRIDE zink
+                --set GALLIUM_DRIVER zink
+                --set WEBKIT_DISABLE_DMABUF_RENDERER 1
+              ''}
+            )
+          '';
+
+          postInstall = ''
+            rm -f $out/LICENSE.txt
+          '';
+
           passthru.updateScript = nix-update-script { };
 
           meta = {
@@ -133,20 +280,23 @@
               Snapmaker Orca is a fork of OrcaSlicer maintained by Snapmaker,
               tuned for the Snapmaker U1 multi-color printer with SnapSwap
               integration and Snapmaker-curated filament profiles. This
-              package wraps the upstream Linux AppImage for reproducible use
-              on NixOS.
+              derivation builds the slicer from source against nixpkgs
+              dependencies (no AppImage, no FHS sandbox), mirroring the
+              setup of the upstream `orca-slicer` nixpkgs package.
 
-              The project is in public beta; release cadence is irregular.
+              On NVIDIA hosts the default GL path uses mesa + zink (OpenGL
+              over Vulkan) to avoid the proprietary driver's unstable EGL
+              implementation; set `withNvidiaGLWorkaround = false` to use
+              the native NVIDIA EGL path if it works on your system.
             '';
             homepage = "https://www.snapmaker.com/snapmaker-orca";
-            changelog = "https://github.com/Snapmaker/OrcaSlicer/releases/tag/v${version}";
+            changelog = "https://github.com/Snapmaker/OrcaSlicer/releases/tag/v${finalAttrs.version}";
             license = lib.licenses.agpl3Only;
-            sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
             platforms = [ "x86_64-linux" ];
-            mainProgram = pname;
+            mainProgram = "snapmaker-orca";
             maintainers = [ ];
           };
-        };
+        });
     in
     {
       packages = forAllSystems (
@@ -173,6 +323,8 @@
         snapmaker-orca = final.callPackage snapmakerOrca { };
       };
 
+      # `nix flake check` runs evaluation only by default; we expose the
+      # build as an explicit check for CI runs that can afford it.
       checks = forAllSystems (
         { system, ... }:
         {
