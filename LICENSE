@@ -23,6 +23,7 @@ SOFTWARE.
 ---
 
 Note: This license applies only to the Nix packaging code in this repository
-(flake.nix and accompanying files). The wrapped AppImage distributed via
-`nix build` remains under the upstream license of Snapmaker Orca — AGPL-3.0-only —
-as defined at https://github.com/Snapmaker/OrcaSlicer.
+(flake.nix, patches/*.patch, and accompanying files). The Snapmaker Orca
+binary produced by `nix build` is compiled from the upstream source at
+https://github.com/Snapmaker/OrcaSlicer and remains under its original
+license — AGPL-3.0-only.
