@@ -97,13 +97,13 @@
         in
         stdenv.mkDerivation (finalAttrs: {
           pname = "snapmaker-orca";
-          version = "2.3.0";
+          version = "2.3.1";
 
           src = fetchFromGitHub {
             owner = "Snapmaker";
             repo = "OrcaSlicer";
             tag = "v${finalAttrs.version}";
-            hash = "sha256-ytlBQHvk1zjcDYN751pTeFtSeTfado5rAfivLxEq84o=";
+            hash = "sha256-klPwPEiZ9hpvrJrZdvM0S1GSgWH4WTIFNkBTetIdMWs=";
           };
 
           nativeBuildInputs = [
