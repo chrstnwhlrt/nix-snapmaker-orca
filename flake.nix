@@ -346,7 +346,7 @@
         }:
         {
           options.programs.snapmaker-orca = {
-            enable = lib.mkEnableOption "Snapmaker Orca slicer and the CJK fonts its Preferences dialog requires";
+            enable = lib.mkEnableOption "Snapmaker Orca (also adds the CJK fonts its Preferences dialog requires)";
             package = lib.mkOption {
               type = lib.types.package;
               default = self.packages.${pkgs.stdenv.hostPlatform.system}.snapmaker-orca;
