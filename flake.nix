@@ -323,6 +323,47 @@
         snapmaker-orca = final.callPackage snapmakerOrca { };
       };
 
+      # NixOS module — ships the package plus the CJK fonts it requires.
+      #
+      # Why: Orca's Preferences dialog lists languages in native scripts
+      # (简体中文, 한국어, 日本語, etc.). Pango crashes with SIGSEGV in
+      # `ensure_faces` when no CJK fallback font is available in
+      # fontconfig, which happens on minimal NixOS installs that only
+      # ship Latin-script Noto variants. These two packages cover every
+      # glyph range the combobox iterates through.
+      #
+      # The CJK dependency is expressed here (declaratively, next to the
+      # package) rather than bundled into the derivation's closure so it
+      # benefits other CJK-using apps on the host and remains consistent
+      # with nixpkgs' upstream `orca-slicer` package (which does not
+      # bundle fonts either).
+      nixosModules.default =
+        {
+          pkgs,
+          lib,
+          config,
+          ...
+        }:
+        {
+          options.programs.snapmaker-orca = {
+            enable = lib.mkEnableOption "Snapmaker Orca slicer and the CJK fonts its Preferences dialog requires";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = self.packages.${pkgs.stdenv.hostPlatform.system}.snapmaker-orca;
+              defaultText = lib.literalExpression "inputs.snapmaker-orca.packages.\${pkgs.stdenv.hostPlatform.system}.snapmaker-orca";
+              description = "The snapmaker-orca derivation to install.";
+            };
+          };
+
+          config = lib.mkIf config.programs.snapmaker-orca.enable {
+            environment.systemPackages = [ config.programs.snapmaker-orca.package ];
+            fonts.packages = with pkgs; [
+              noto-fonts-cjk-sans
+              noto-fonts-cjk-serif
+            ];
+          };
+        };
+
       # `nix flake check` runs evaluation only by default; we expose the
       # build as an explicit check for CI runs that can afford it.
       checks = forAllSystems (
