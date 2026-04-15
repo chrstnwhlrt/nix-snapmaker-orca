@@ -319,7 +319,7 @@
 
           snapmaker-orca = (pkgs.callPackage snapmakerOrca { }).overrideAttrs (old: {
             preFixup = (old.preFixup or "") + ''
-              gappsWrapperArgs+=( --prefix LD_LIBRARY_PATH : "${pango-hotfix}/lib" )
+              gappsWrapperArgs+=( --prefix LD_LIBRARY_PATH : "${pango-hotfix.out}/lib" )
             '';
           });
           default = snapmaker-orca;
