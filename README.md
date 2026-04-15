@@ -135,6 +135,62 @@ After any upstream bump re-check the three patches:
 `no-ilmbase.patch`. If Snapmaker moves the corresponding source lines
 the patches' context hunks will need small adjustments.
 
+## Temporary hotfix: pango 1.57.1
+
+While nixpkgs' `nixos-unstable` pins `pango` to **1.57.0**, the flake
+carries a small hotfix that swaps in **pango 1.57.1** at runtime via
+`LD_LIBRARY_PATH`. Without it, opening Orca's **Preferences** dialog
+segfaults inside `ensure_faces` (upstream pango issue
+[#867](https://gitlab.gnome.org/GNOME/pango/-/issues/867)), because
+1.57.0 dereferences a NULL `PangoFcFont` while measuring the CJK
+entries of the language combobox.
+
+The fix lives entirely in `flake.nix` (`pango-hotfix` derivation +
+`preFixup` override on `snapmaker-orca`). It rebuilds **only** pango
+and the slicer wrapper — gtk3, wxwidgets and webkitgtk_4_1 are
+untouched because pango's ABI is stable across 1.57.x.
+
+### When to remove
+
+As soon as nixpkgs ships `pango >= 1.57.1`. Track upstream:
+[NixOS/nixpkgs#505692](https://github.com/NixOS/nixpkgs/pull/505692).
+
+Check whether it landed:
+
+```bash
+nix eval --raw nixpkgs#pango.version
+# → 1.57.1 or newer means the hotfix is no longer needed
+```
+
+### How to remove
+
+In `flake.nix`, drop the two marked blocks inside
+`packages = forAllSystems (...)`:
+
+1. Delete the entire `pango-hotfix = pkgs.pango.overrideAttrs (...)` block.
+2. Revert the slicer derivation back to a plain `callPackage`:
+
+   ```nix
+   # before (with hotfix)
+   snapmaker-orca = (pkgs.callPackage snapmakerOrca { }).overrideAttrs (old: {
+     preFixup = (old.preFixup or "") + ''
+       gappsWrapperArgs+=( --prefix LD_LIBRARY_PATH : "${pango-hotfix.out}/lib" )
+     '';
+   });
+
+   # after (clean)
+   snapmaker-orca = pkgs.callPackage snapmakerOrca { };
+   ```
+
+3. `nix flake update && nix build .#default` — verify it still builds.
+4. Launch the slicer, open **Preferences** → the dialog must come up
+   without crashing (regression check for #867).
+5. Commit:
+
+   ```bash
+   git commit -am "flake: drop pango hotfix (nixpkgs now ships >= 1.57.1)"
+   ```
+
 ## Flake outputs
 
 | output                          | purpose                                                            |
