@@ -27,13 +27,50 @@ Install imperatively to your user profile:
 nix profile install github:chrstnwhlrt/nix-snapmaker-orca
 ```
 
-## As a flake input
+## As a NixOS module (recommended)
+
+The flake exports `nixosModules.default`, which installs the slicer
+**and** pulls in the CJK fonts the Preferences dialog needs
+(`noto-fonts-cjk-sans`, `noto-fonts-cjk-serif`). Without those fonts
+Pango crashes with `SIGSEGV` in `ensure_faces` when the Preferences
+language combobox renders `简体中文` / `한국어` / `日本語`.
 
 ```nix
 {
   inputs.snapmaker-orca.url = "github:chrstnwhlrt/nix-snapmaker-orca";
 
-  outputs = { self, nixpkgs, snapmaker-orca, ... }: {
+  outputs = { nixpkgs, snapmaker-orca, ... }: {
+    nixosConfigurations.your-host = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        snapmaker-orca.nixosModules.default
+        {
+          programs.snapmaker-orca.enable = true;
+        }
+      ];
+    };
+  };
+}
+```
+
+Options provided by the module:
+
+| option                                   | default                                             | purpose                                                       |
+| ---------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| `programs.snapmaker-orca.enable`         | `false`                                             | Install the slicer and add `noto-fonts-cjk-{sans,serif}`.     |
+| `programs.snapmaker-orca.package`        | `inputs.snapmaker-orca.packages.${system}.snapmaker-orca` | Override the derivation (e.g. to pass `withNvidiaGLWorkaround = false`). |
+
+## As a bare flake input (no CJK fonts auto-added)
+
+If you already manage CJK fonts elsewhere or do not care about the
+Preferences dialog, you can skip the module and install the package
+directly:
+
+```nix
+{
+  inputs.snapmaker-orca.url = "github:chrstnwhlrt/nix-snapmaker-orca";
+
+  outputs = { nixpkgs, snapmaker-orca, ... }: {
     nixosConfigurations.your-host = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
@@ -41,6 +78,9 @@ nix profile install github:chrstnwhlrt/nix-snapmaker-orca
           environment.systemPackages = [
             snapmaker-orca.packages.${pkgs.system}.default
           ];
+          # Needed to open Preferences without crashing; see the module
+          # section above for the packaged alternative.
+          fonts.packages = with pkgs; [ noto-fonts-cjk-sans noto-fonts-cjk-serif ];
         })
       ];
     };
@@ -54,6 +94,7 @@ nix profile install github:chrstnwhlrt/nix-snapmaker-orca
 {
   nixpkgs.overlays = [ inputs.snapmaker-orca.overlays.default ];
   environment.systemPackages = [ pkgs.snapmaker-orca ];
+  fonts.packages = with pkgs; [ noto-fonts-cjk-sans noto-fonts-cjk-serif ];
 }
 ```
 
@@ -96,13 +137,14 @@ the patches' context hunks will need small adjustments.
 
 ## Flake outputs
 
-| output                          | purpose                                         |
-| ------------------------------- | ----------------------------------------------- |
-| `packages.x86_64-linux.default` | the slicer derivation, built from source        |
-| `apps.x86_64-linux.default`     | `nix run` target                                |
-| `overlays.default`              | adds `pkgs.snapmaker-orca`                      |
-| `checks.x86_64-linux.build`     | `nix flake check` will actually build it        |
-| `formatter.x86_64-linux`        | `nix fmt` uses `pkgs.nixfmt`                    |
+| output                          | purpose                                                            |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `packages.x86_64-linux.default` | the slicer derivation, built from source                           |
+| `apps.x86_64-linux.default`     | `nix run` target                                                   |
+| `overlays.default`              | adds `pkgs.snapmaker-orca`                                         |
+| `nixosModules.default`          | installs slicer + CJK fonts via `programs.snapmaker-orca.enable`   |
+| `checks.x86_64-linux.build`     | `nix flake check` will actually build it                           |
+| `formatter.x86_64-linux`        | `nix fmt` uses `pkgs.nixfmt`                                       |
 
 ## Requirements
 
