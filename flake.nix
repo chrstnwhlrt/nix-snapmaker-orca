@@ -97,13 +97,13 @@
         in
         stdenv.mkDerivation (finalAttrs: {
           pname = "snapmaker-orca";
-          version = "2.3.1";
+          version = "2.3.4";
 
           src = fetchFromGitHub {
             owner = "Snapmaker";
             repo = "OrcaSlicer";
             tag = "v${finalAttrs.version}";
-            hash = "sha256-klPwPEiZ9hpvrJrZdvM0S1GSgWH4WTIFNkBTetIdMWs=";
+            hash = "sha256-y1L8+01HgmeOAwpJPrzLc1RkFKdq2OjFiBISq5xCSlc=";
           };
 
           nativeBuildInputs = [
@@ -302,26 +302,7 @@
       packages = forAllSystems (
         { pkgs, ... }:
         rec {
-          # HOTFIX — remove once nixpkgs ships pango >= 1.57.1
-          # (tracked in nixpkgs PR #505692). pango 1.57.0 crashes with a
-          # NULL-pointer deref in `ensure_faces` when the Preferences
-          # language combobox asks for text extents of its CJK entries
-          # (upstream pango issue #867, fixed in 1.57.1). Injected via
-          # LD_LIBRARY_PATH in preFixup so neither gtk3 nor webkitgtk_4_1
-          # need a rebuild — ABI is stable across 1.57.x.
-          pango-hotfix = pkgs.pango.overrideAttrs (_: rec {
-            version = "1.57.1";
-            src = pkgs.fetchurl {
-              url = "mirror://gnome/sources/pango/1.57/pango-${version}.tar.xz";
-              hash = "sha256-5l1tEXCA3Drut9i0s7UY9zg6oubPziMRfGI81iR2TC8=";
-            };
-          });
-
-          snapmaker-orca = (pkgs.callPackage snapmakerOrca { }).overrideAttrs (old: {
-            preFixup = (old.preFixup or "") + ''
-              gappsWrapperArgs+=( --prefix LD_LIBRARY_PATH : "${pango-hotfix.out}/lib" )
-            '';
-          });
+          snapmaker-orca = pkgs.callPackage snapmakerOrca { };
           default = snapmaker-orca;
         }
       );
