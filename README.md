@@ -115,6 +115,18 @@ derivation directly:
 snapmaker-orca = final.callPackage snapmakerOrca { withNvidiaGLWorkaround = false; };
 ```
 
+## Wayland (EGL 3D canvas)
+
+The slicer is built with wxWidgets' `withEGL = true`, so the 3D
+viewport's `wxGLCanvas` uses the native Wayland **EGL** path (a
+subsurface) instead of GLX. With GLX the viewport renders **blank** on
+Wayland compositors since the `wayland 1.25` / `gtk 3.24.52` bump — a
+known wxWidgets 3.1 issue
+([#23389](https://github.com/wxWidgets/wxWidgets/issues/23389),
+[#25848](https://groups.google.com/g/wx-dev/c/VbhZkGWQEvg)). EGL renders
+correctly and, together with the mesa+zink workaround above, sidesteps
+NVIDIA's crashing EGL on Wayland. Verified on niri.
+
 ## Updating to a new upstream release
 
 When Snapmaker publishes a new release:

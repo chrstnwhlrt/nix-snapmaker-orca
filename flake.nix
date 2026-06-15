@@ -85,7 +85,12 @@
               withCurl = true;
               withPrivateFonts = true;
               withWebKit = true;
-              withEGL = false;
+              # Wayland: use the native EGL wxGLCanvas path (subsurface) instead
+              # of GLX. GLX-on-Wayland leaves the 3D viewport blank since the
+              # wayland 1.25 / gtk 3.24.52 bump (wxWidgets #23389/#25848). The
+              # mesa+zink EGL workaround (withNvidiaGLWorkaround) keeps NVIDIA's
+              # crashing EGL out of the loop.
+              withEGL = true;
             }).overrideAttrs
               (old: {
                 buildInputs = old.buildInputs ++ [ libsecret ];
