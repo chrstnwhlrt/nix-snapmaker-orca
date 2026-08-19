@@ -1,3 +1,5 @@
+
+
 # nix-snapmaker-orca
 
 Nix flake packaging [Snapmaker Orca](https://www.snapmaker.com/snapmaker-orca)
@@ -172,6 +174,9 @@ First build is **~25 minutes on 24 cores** (no superbuild — nixpkgs
 provides Boost, OCCT, wxWidgets and friends, and only Snapmaker's
 vendored `deps_src/` libraries plus the slicer itself are compiled).
 Subsequent rebuilds are fully cached unless a dependency changes.
+
+The repository's CI runs `nix flake check --no-build`; it only
+evaluates the flake and does not build the package.
 
 ## Patches applied
 
