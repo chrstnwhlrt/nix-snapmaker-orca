@@ -65,7 +65,6 @@
           opencascade-occt_7_6,
           openvdb,
           opencv,
-          pcre,
           systemd,
           onetbb,
           webkitgtk_4_1,
@@ -156,7 +155,6 @@
             nlopt
             opencascade-occt_7_6
             openvdb
-            pcre
             onetbb
             webkitgtk_4_1
             wxGTK'
